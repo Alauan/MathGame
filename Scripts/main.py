@@ -7,17 +7,25 @@ clock = pg.time.Clock()
 pg.init()
 
 # colors
-WHITE = pg.Color(248, 251, 255)
+WHITE = pg.Color(255, 250, 245)
 TRANSPARENT_RED = pg.Color(255, 50, 50, 160)
+TRANSPARENT_GREEN = pg.Color(10, 220, 10, 160)
+TRANSPARENT_YELLOW = pg.Color(255, 255, 160, 160)
 RED = pg.Color(255, 40, 40)
+GREEN = pg.Color(10, 220, 10)
+YELLOW = pg.Color(255, 255, 0)
 BLACK = pg.Color(0, 0, 0)
 TRANSPARENT = (0, 0, 0, 0)
+
+# fonts
+font_enunciado = pg.font.SysFont('Calibri', 20)
 
 # surfaces
 WINDOWSIZE = 900, 600
 screen = pg.display.set_mode(WINDOWSIZE)
 levelSurf = pg.Surface(WINDOWSIZE, flags=SRCALPHA)
 clickSurf = pg.Surface(WINDOWSIZE, flags=SRCALPHA)
+highlights = pg.Surface(WINDOWSIZE, flags=SRCALPHA)
 
 
 # level surface
@@ -37,7 +45,10 @@ levelSurf.fill(TRANSPARENT)
 pg.draw.circle(levelSurf, BLACK, ref((400, 250)), 150, 1)
 pg.draw.aalines(levelSurf, BLACK, True, ref(((250, 250), (550, 250), (809, 100), (164, 100))))
 pg.draw.aaline(levelSurf, BLACK, ref((400, 450)), ref((400, 50)))
-
+Enunciado = ['1- Os pontos B e F são extremidades da circunferência de equação x² + y² = 81 e o segmento ',
+             'DE é tangente à circunferência dada no ponto C(0, 9)']
+for index, linha in enumerate(Enunciado):
+    levelSurf.blit(font_enunciado.render(linha, True, BLACK), (60, 25*index+40))
 
 # variables
 mouse = {'buttons': [False, False, False], 'pos': (0, 0), 'just_pressed': [False, False, False]}
@@ -47,11 +58,12 @@ user_input = ''
 
 # classes
 class Polygon:
-    def __init__(self, window_size, points, color=(255, 50, 50, 140)):
+    def __init__(self, window_size, points, right_point=(0, 0), color=(255, 50, 50, 140)):
         self.surface = pg.Surface(window_size, flags=SRCALPHA)
         self.ini_points = points
         self.points = points
         self.color = pg.Color(color)
+        self.right_point = right_point
         self.n_sides = len(points)
         self.is_hold = False
 
@@ -64,6 +76,10 @@ class Polygon:
         if self.is_hold:
             if not segurando:
                 self.is_hold = False
+                if abs(self.points[0][0] - self.right_point[0]) < 15 and \
+                        abs(self.points[0][1] - self.right_point[1]) < 15:
+                    self.move((0, 0), (self.right_point[0] - self.points[0][0],
+                                       self.right_point[1] - self.points[0][1]))
             else:
                 self.move(ini_cursor, cursor)
 
@@ -93,44 +109,52 @@ class Polygon:
 
 
 class Click:
-    def __init__(self, symbol: str, pos, surface):
+    def __init__(self, symbol: str, pos, surface, right_value, rect=None):
         self.symbol = symbol
         self.pos = pos
         self.surface = surface
+        self.right_value = right_value
+        self.rect = rect
         self.box = pg.Rect((pos[0], pos[1], 30, 30))
+        self.value = ''
         self.is_getting_input = False
-        self.value = ' '
 
         self.font = pg.font.SysFont('Corbel', 30)
         self.symbol_surf = self.font.render(self.symbol, True, BLACK)
 
     def update(self, clicou_agora: bool, cursor: List, caractere: str):
         """ This function must be updated every loop """
+        terminou = False
         if clicou_agora:
             if self.is_within(cursor):
+                self.symbol_surf = self.font.render(self.symbol + '=' + self.value, True, RED)
                 self.is_getting_input = True
             else:
-                if self.value not in ' ':
-                    self.symbol_surf = self.font.render(self.symbol + '=' + self.value, True, BLACK)
-                else:
-                    self.symbol_surf = self.font.render(self.symbol, True, BLACK)
-                self.is_getting_input = False
+                terminou = True
         if caractere == 'RETURN':
-            if self.value not in ' ':
-                self.symbol_surf = self.font.render(self.symbol + '=' + self.value, True, BLACK)
+            terminou = True
+        if terminou:
+            if self.value.strip() == self.right_value:
+                cor = GREEN
             else:
-                self.symbol_surf = self.font.render(self.symbol, True, BLACK)
+                cor = BLACK
+            if self.value not in '':
+                self.symbol_surf = self.font.render(self.symbol + '=' + self.value, True, cor)
+            else:
+                self.symbol_surf = self.font.render(self.symbol, True, cor)
             self.is_getting_input = False
+
         if self.is_getting_input:
             self.open(caractere)
-
+            if self.rect:
+                pg.draw.rect(self.surface, YELLOW, self.rect)
         self.blit()
 
     def is_within(self, cursor):
         return self.box.collidepoint(cursor)
 
     def open(self, text):
-        if self.value != text:
+        if text != '':
             if text == 'BACKSPACE':
                 self.value = self.value[:-1]
             else:
@@ -141,10 +165,12 @@ class Click:
         self.surface.blit(self.symbol_surf, self.pos)
 
 
-polygons = [Polygon(WINDOWSIZE, [[10, 10], [10, 150], [250, 150]]),
-            Polygon(WINDOWSIZE, [[10, 10], [10, 150], [250, 150], [300, 50], [100, 100]])]
+polygons = [Polygon(WINDOWSIZE, [[640, 430], [640, 580], [940, 580], [940, 430]], (170, 200)),
+            Polygon(WINDOWSIZE, [[640, 430], [900, 430], [640, 580]], (471, 200), TRANSPARENT_GREEN),
+            Polygon(WINDOWSIZE, [[600, 430], [600, 580], [515, 430]], (169, 200), TRANSPARENT_YELLOW)]
 
-clicaveis = [Click('α', (300, 300), clickSurf), Click('β', (400, 300), clickSurf)]
+clicaveis = [Click('α', (331, 211), clickSurf, '90', [57, 62, 253, 23]),
+             Click('R', (340, 285), clickSurf, '9', [595, 37, 96, 23])]
 
 # main loop
 while True:
@@ -159,6 +185,7 @@ while True:
             if event.button <= 3:
                 mouse['buttons'][event.button - 1] = True
                 mouse['just_pressed'][event.button - 1] = True
+                print(mouse['pos'])
         elif event.type == MOUSEBUTTONUP:
             if event.button <= 3:
                 mouse['buttons'][event.button - 1] = False
