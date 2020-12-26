@@ -55,21 +55,25 @@ for index, linha in enumerate(Enunciado):
 mouse = {'buttons': [False, False, False], 'pos_rect': (0, 0), 'just_pressed': [False, False, False]}
 ini_mouse = mouse['pos_rect']
 user_input = ''
+contar = []
+contador = {}
 
 
 # classes
 class Polygon:
-    def __init__(self, window_size, points, right_point=(0, 0), color=RED):
+    def __init__(self, window_size, points, position, right_point=(0, 0), color=RED):
         self.surface = pg.Surface(window_size, flags=SRCALPHA)
-        self.ini_points = points
-        self.points = points
+        self.position = list(position)
+        self.points = tuple(points)
         self.color = pg.Color(color)
-        self.right_point = right_point
+        self.right_point = list(right_point)
         self.n_sides = len(points)
         self.is_hold = False
 
     def update(self, clicou_agora: bool, cursor: List, ini_cursor: List, segurando: bool):
         """ This function must be executed every loop """
+        """ Exceptionally the self.draw() function is not inside update() because there are some cases that i want to 
+        draw the polygons and not be able to move it"""
         self.surface.fill(TRANSPARENT)
         if clicou_agora:
             if self.is_within(cursor):
@@ -77,38 +81,38 @@ class Polygon:
         if self.is_hold:
             if not segurando:
                 self.is_hold = False
-                if abs(self.points[0][0] - self.right_point[0]) < 15 and \
-                        abs(self.points[0][1] - self.right_point[1]) < 15:
-                    self.move(self.points[0], self.right_point)
+                if abs(self.position[0] - self.right_point[0]) < 15 and \
+                        abs(self.position[1] - self.right_point[1]) < 15:
+                    self.move(self.position, self.right_point)
             else:
                 self.move(ini_cursor, cursor)
 
-        self.draw()
-
     def is_within(self, cursor) -> bool:
         """ Tells if a point is within the polygon """
+        rel_cursor = (cursor[0] - self.position[0], cursor[1] - self.position[1])  # relative to the position
         odd_nodes = False
         for index in range(len(self.points)):
-            if (self.points[index][1] > cursor[1] > self.points[index - 1][1] or self.points[index][1] < cursor[1] <
-                self.points[index - 1][1]) \
-                    and (cursor[0] >= self.points[index][0] or cursor[0] >= self.points[index - 1][0]):
-                if (((self.points[index][0] - self.points[index - 1][0]) * (cursor[1] - self.points[index][1])) /
-                        (self.points[index - 1][1] - self.points[index][1])) > self.points[index][0] - cursor[0]:
+            if (self.points[index][1] > rel_cursor[1] > self.points[index - 1][1] or self.points[index][1]
+                < rel_cursor[1] < self.points[index - 1][1]) \
+                    and (rel_cursor[0] >= self.points[index][0] or rel_cursor[0] >= self.points[index - 1][0]):
+                if (((self.points[index][0] - self.points[index - 1][0]) * (rel_cursor[1] - self.points[index][1])) /
+                        (self.points[index - 1][1] - self.points[index][1])) > self.points[index][0] - rel_cursor[0]:
                     odd_nodes = not odd_nodes
         return odd_nodes
 
     def move(self, ini_cursor, fin_cursor):
         """ Moves the polygon """
-        self.points = [[self.points[p][0] + fin_cursor[0] - ini_cursor[0],
-                        self.points[p][1] + fin_cursor[1] - ini_cursor[1]] for p in range(self.n_sides)]
+        self.position = [self.position[0] + fin_cursor[0] - ini_cursor[0],
+                         self.position[1] + fin_cursor[1] - ini_cursor[1]]
 
     def is_in_right_point(self):
-        return self.points[0][0] == self.right_point[0] and self.points[0][1] == self.right_point[1]
+        return self.position == self.right_point
 
     def draw(self):
         """ Draws the polygon onto its surface """
-        pg.draw.polygon(self.surface, (0, 0, 0, 30), self.points)
-        pg.draw.aalines(self.surface, self.color, True, self.points)
+        rel_points = [(self.position[0] + point[0], self.position[1] + point[1]) for point in self.points]
+        pg.draw.polygon(self.surface, (0, 0, 0, 30), rel_points)
+        pg.draw.lines(self.surface, self.color, True, rel_points, 2)
 
 
 class Click:
@@ -153,6 +157,9 @@ class Click:
                 pg.draw.rect(self.surface, YELLOW, self.rect)
         self.blit()
 
+    def is_value_right(self):
+        return self.value.strip() == self.right_value and not self.is_getting_input
+
     def is_within(self, cursor):
         return self.box.collidepoint(cursor)
 
@@ -188,7 +195,7 @@ class Angle:
     def draw(self):
         if self.grau != 90:
             pg.draw.arc(self.surface, RED, (self.pos_rect[0], self.pos_rect[1], self.tamanho, self.tamanho),
-                        self.comeco_rad, self.comeco_rad + self.grau_rad, 2)
+                        self.comeco_rad, self.comeco_rad + self.grau_rad, 1)
         else:
             pg.draw.aalines(self.surface, RED, False,
                             [(self.pos[0] + self.tamanho // 2 * cos(self.comeco_rad),
@@ -204,16 +211,20 @@ class Angle:
             self.surface.blit(self.num_surf, self.num_pos)
 
 
-polygons = [Polygon(WINDOWSIZE, [[640, 430], [640, 580], [940, 580], [940, 430]], (170, 200)),
-            Polygon(WINDOWSIZE, [[640, 430], [900, 430], [640, 580]], (471, 200), GREEN),
-            Polygon(WINDOWSIZE, [[600, 430], [600, 580], [515, 430]], (169, 200), YELLOW)]
+polygons = [Polygon(WINDOWSIZE, [[0, 0], [0, 148], [298, 148], [298, 0]], [600, 400], (171, 201)),
+            Polygon(WINDOWSIZE, [[0, 0], [259, 0], [0, 150]], [450, 400], (471, 200), GREEN),
+            Polygon(WINDOWSIZE, [[0, 0], [85, 150], [85, 0]], [350, 400], (85, 200), YELLOW)]
+polygons_update = []  # these polygons will be updated
+polygons_show = []  # these polygons will be shown
 
 clicaveis = [Click('α', (346, 218), clickSurf, '90', [57, 62, 253, 23]),
              Click('R', (340, 285), clickSurf, '9', [595, 37, 96, 23])]
+clicaveis_update = [0, 1]  # these clicaveis will be shown and updated
 
-angulos = [[Angle(270, 90, (320, 200), clickSurf)],
-           [Angle(0, 120, (170, 350), clickSurf, (195, 310))],
-           [Angle(30, 150, (470, 350), clickSurf, (398, 307))]]
+angles = [[Angle(270, 89, (320, 200), clickSurf)],
+          [Angle(0, 120, (170, 350), clickSurf, (195, 310))],
+          [Angle(30, 150, (470, 350), clickSurf, (398, 307))]]
+angles_update = [0, 1, 2]  # these angles will be shown and updated
 
 # main loop
 while True:
@@ -243,22 +254,45 @@ while True:
             else:
                 user_input = event.unicode
 
-    # processamento
-    for poly in polygons:
-        poly.update(mouse['just_pressed'][0], mouse['pos_rect'], ini_mouse, mouse['buttons'][0])
-    for clicavel in clicaveis:
-        clicavel.update(mouse['just_pressed'][0], mouse['pos_rect'], user_input)
-    for conjunto in angulos:
-        for angulo in conjunto:
+    # processing
+    for index in polygons_update:
+        polygons[index].update(mouse['just_pressed'][0], mouse['pos_rect'], ini_mouse, mouse['buttons'][0])
+    for index in polygons_show:
+        polygons[index].draw()
+    for index in clicaveis_update:
+        clicaveis[index].update(mouse['just_pressed'][0], mouse['pos_rect'], user_input)
+    for index in angles_update:
+        for angulo in angles[index]:
             angulo.draw()
 
-    if polygons[0].is_in_right_point():
-        if len(angulos[1]) == 1:
-            angulos[1] = [Angle(0, 90, (170, 350), clickSurf, (195, 310)),
-                          Angle(90, 30, (170, 350), clickSurf, (142, 284), tamanho=70)]
-        if len(angulos[2]) == 1:
-            angulos[2] = [Angle(30, 60, (470, 350), clickSurf, (480, 301)),
-                          Angle(90, 90, (470, 350), clickSurf, (412, 310))]
+    if polygons_show:
+        # splitting the angles according to the polygons
+        if len(angles[1]) == 1:
+            if polygons[0].is_in_right_point() or polygons[2].is_in_right_point():
+                angles[1] = [Angle(0, 90, (170, 350), clickSurf, (195, 310)),
+                             Angle(90, 30, (170, 350), clickSurf, (142, 284), tamanho=70)]
+        if len(angles[2]) == 1:
+            if polygons[0].is_in_right_point() or polygons[1].is_in_right_point():
+                angles[2] = [Angle(30, 60, (470, 350), clickSurf, (480, 301)),
+                             Angle(90, 90, (470, 350), clickSurf, (412, 310))]
+
+        # stopping to update polygons that are already on the right spot
+        for index in polygons_update:
+            if polygons[index].is_in_right_point():
+                polygons_update.remove(index)
+
+    else:
+        if 0 in clicaveis_update:
+            if clicaveis[0].is_value_right():
+                angles[0][0].grau = 90
+                clicaveis_update.remove(0)
+
+        if all([clicavel.is_value_right() for clicavel in clicaveis]):
+            polygons_update.extend((0, 1, 2))
+            polygons_show.extend((0, 1, 2))
+
+    for key in contador:
+        contador[key] -= 1
 
     # screen assembly
     screen.blit(clickSurf, (0, 0))
