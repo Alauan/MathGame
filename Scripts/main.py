@@ -1,8 +1,9 @@
 import pygame as pg
 from pygame.locals import *
 import sys
-from math import sin, cos
-from typing import List
+from math import sin, cos, tan, atan, pi
+from typing import List, Tuple, Union
+import math_functions as mf
 
 clock = pg.time.Clock()
 pg.init()
@@ -61,58 +62,87 @@ contador = {}
 
 # classes
 class Polygon:
-    def __init__(self, window_size, points, position, right_point=(0, 0), color=RED):
+    def __init__(self, window_size, points, position, right_point=(0, 0), rotation=0, color=RED):
         self.surface = pg.Surface(window_size, flags=SRCALPHA)
         self.position = list(position)
+        self.rotation = rotation  # In degrees
+        self.barycentre = mf.barycentre(points, get_round=True)  # Center point to make rotations
         self.points = tuple(points)
-        self.color = pg.Color(color)
-        self.right_point = list(right_point)
-        self.n_sides = len(points)
-        self.is_hold = False
+        self.rel_pts = list(points)  # Points relative to position and rotation
+        self.transform((0, 0), (0, 0))
 
-    def update(self, clicou_agora: bool, cursor: List, ini_cursor: List, segurando: bool):
+        self.color = pg.Color(color)
+        self.right_point = list(right_point)  # The point witch the polygon will stick
+        self.n_sides = len(points)
+        self.is_hold = [0, 0, 0]  # holds a list containing mouse buttons that were pressed inside the polygon
+
+    def update(self, clicou_agora: Union[List, Tuple], cursor: List, ini_cursor: List, segurando: Union[List, Tuple]):
         """ This function must be executed every loop """
-        """ Exceptionally the self.draw() function is not inside update() because there are some cases that i want to 
-        draw the polygons and not be able to move it"""
+        """ Exceptionally, self.draw() is not inside update() because there are some cases that I want to 
+        draw the polygons and not be able to move them"""
         self.surface.fill(TRANSPARENT)
-        if clicou_agora:
+        if any(clicou_agora):
             if self.is_within(cursor):
-                self.is_hold = True
-        if self.is_hold:
-            if not segurando:
-                self.is_hold = False
+                self.is_hold = clicou_agora
+        if self.is_hold[0]:
+            if segurando[0]:
+                self.transform(ini_cursor, cursor, move=True)
+            else:
+                self.is_hold[0] = False
                 if abs(self.position[0] - self.right_point[0]) < 15 and \
                         abs(self.position[1] - self.right_point[1]) < 15:
-                    self.move(self.position, self.right_point)
+                    self.transform(self.position, self.right_point, move=True)
+        if self.is_hold[2]:
+            if segurando[2]:
+                self.transform(ini_cursor, cursor, rotate=True)
             else:
-                self.move(ini_cursor, cursor)
+                self.is_hold[2] = False
 
     def is_within(self, cursor) -> bool:
         """ Tells if a point is within the polygon """
-        rel_cursor = (cursor[0] - self.position[0], cursor[1] - self.position[1])  # relative to the position
         odd_nodes = False
-        for index in range(len(self.points)):
-            if (self.points[index][1] > rel_cursor[1] > self.points[index - 1][1] or self.points[index][1]
-                < rel_cursor[1] < self.points[index - 1][1]) \
-                    and (rel_cursor[0] >= self.points[index][0] or rel_cursor[0] >= self.points[index - 1][0]):
-                if (((self.points[index][0] - self.points[index - 1][0]) * (rel_cursor[1] - self.points[index][1])) /
-                        (self.points[index - 1][1] - self.points[index][1])) > self.points[index][0] - rel_cursor[0]:
+        for index in range(len(self.rel_pts)):
+            if (self.rel_pts[index][1] > cursor[1] > self.rel_pts[index - 1][1] or self.rel_pts[index][1]
+                < cursor[1] < self.rel_pts[index - 1][1]) \
+                    and (cursor[0] >= self.rel_pts[index][0] or cursor[0] >= self.rel_pts[index - 1][0]):
+                if (((self.rel_pts[index][0] - self.rel_pts[index - 1][0]) * (cursor[1] - self.rel_pts[index][1])) /
+                        (self.rel_pts[index - 1][1] - self.rel_pts[index][1])) > self.rel_pts[index][0] - cursor[0]:
                     odd_nodes = not odd_nodes
         return odd_nodes
 
-    def move(self, ini_cursor, fin_cursor):
-        """ Moves the polygon """
-        self.position = [self.position[0] + fin_cursor[0] - ini_cursor[0],
-                         self.position[1] + fin_cursor[1] - ini_cursor[1]]
+    def transform(self, ini_cursor, fin_cursor, move=False, rotate=False):
+        """ Moves or rotates the polygon """
+        """ Unfortunately I couldn't make two separate functions"""
+        if rotate:
+            self.rotation += fin_cursor[1] - ini_cursor[1]
+        if move:
+            self.position = [self.position[0] + fin_cursor[0] - ini_cursor[0],
+                             self.position[1] + fin_cursor[1] - ini_cursor[1]]
+        rotated = []
+        for index in range(len(self.points)):
+            hip = mf.distance(self.barycentre, self.points[index])
+            tangente = (self.points[index][1] - self.barycentre[1]) / (self.points[index][0] - self.barycentre[0])
+            angle = atan(tangente)
+
+            if angle > 0 and self.points[index][0] - self.barycentre[0] < 0:
+                angle += pi
+            elif angle < 0 and self.points[index][0] - self.barycentre[0] < 0:
+                angle += pi
+
+            angle += self.rotation / 57.29
+            co = round(sin(angle) * hip)
+            ca = round(cos(angle) * hip)
+            rotated.append((self.barycentre[0] + co, self.barycentre[1] + ca))
+        print(rotated)
+        self.rel_pts = [(self.position[0] + point[0], self.position[1] + point[1]) for point in rotated]
 
     def is_in_right_point(self):
         return self.position == self.right_point
 
     def draw(self):
         """ Draws the polygon onto its surface """
-        rel_points = [(self.position[0] + point[0], self.position[1] + point[1]) for point in self.points]
-        pg.draw.polygon(self.surface, (0, 0, 0, 30), rel_points)
-        pg.draw.lines(self.surface, self.color, True, rel_points, 2)
+        pg.draw.polygon(self.surface, (0, 0, 0, 30), self.rel_pts)
+        pg.draw.lines(self.surface, self.color, True, self.rel_pts, 2)
 
 
 class Click:
@@ -212,10 +242,12 @@ class Angle:
 
 
 polygons = [Polygon(WINDOWSIZE, [[0, 0], [0, 148], [298, 148], [298, 0]], [600, 400], (171, 201)),
-            Polygon(WINDOWSIZE, [[0, 0], [259, 0], [0, 150]], [450, 400], (471, 200), GREEN),
-            Polygon(WINDOWSIZE, [[0, 0], [85, 150], [85, 0]], [350, 400], (85, 200), YELLOW)]
+            Polygon(WINDOWSIZE, [[0, 0], [259, 0], [0, 150]], [450, 400], (471, 200), color=GREEN),
+            Polygon(WINDOWSIZE, [[0, 0], [85, 150], [85, 0]], [350, 400], (85, 200), color=YELLOW)]
 polygons_update = []  # these polygons will be updated
 polygons_show = []  # these polygons will be shown
+polygons_update.extend((0, 1, 2))
+polygons_show.extend((0, 1, 2))
 
 clicaveis = [Click('α', (346, 218), clickSurf, '90', [57, 62, 253, 23]),
              Click('R', (340, 285), clickSurf, '9', [595, 37, 96, 23])]
@@ -256,7 +288,7 @@ while True:
 
     # processing
     for index in polygons_update:
-        polygons[index].update(mouse['just_pressed'][0], mouse['pos_rect'], ini_mouse, mouse['buttons'][0])
+        polygons[index].update(mouse['just_pressed'], mouse['pos_rect'], ini_mouse, mouse['buttons'])
     for index in polygons_show:
         polygons[index].draw()
     for index in clicaveis_update:
