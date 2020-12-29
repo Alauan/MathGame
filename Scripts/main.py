@@ -4,6 +4,7 @@ import sys
 from math import sin, cos, tan, atan, pi
 from typing import List, Tuple, Union
 import math_functions as mf
+import cursors
 
 clock = pg.time.Clock()
 pg.init()
@@ -13,6 +14,7 @@ WHITE = pg.Color(255, 250, 245)
 TRANSPARENT_RED = pg.Color(255, 50, 50, 160)
 TRANSPARENT_GREEN = pg.Color(10, 220, 10, 160)
 TRANSPARENT_YELLOW = pg.Color(255, 255, 160, 160)
+LIGHT_BLUE = (70, 100, 220)
 RED = pg.Color(255, 40, 40)
 GREEN = pg.Color(10, 190, 10)
 YELLOW = pg.Color(255, 255, 0)
@@ -62,14 +64,15 @@ contador = {}
 
 # classes
 class Polygon:
-    def __init__(self, window_size, points, position, right_point=(0, 0), rotation=0, color=RED):
+    def __init__(self, window_size, points, position, right_point=(0, 0), rotation=0, right_rotation=0, color=RED):
         self.surface = pg.Surface(window_size, flags=SRCALPHA)
         self.position = list(position)
         self.rotation = rotation  # In degrees
+        self.right_rotation = right_rotation
         self.barycentre = mf.barycentre(points, get_round=True)  # Center point to make rotations
         self.points = tuple(points)
         self.rel_pts = list(points)  # Points relative to position and rotation
-        self.transform((0, 0), (0, 0))
+        self.transform()
 
         self.color = pg.Color(color)
         self.right_point = list(right_point)  # The point witch the polygon will stick
@@ -80,60 +83,53 @@ class Polygon:
         """ This function must be executed every loop """
         """ Exceptionally, self.draw() is not inside update() because there are some cases that I want to 
         draw the polygons and not be able to move them"""
+        soltou_agora = False
         self.surface.fill(TRANSPARENT)
         if any(clicou_agora):
-            if self.is_within(cursor):
+            if mf.is_within(self.rel_pts, cursor):
                 self.is_hold = clicou_agora
         if self.is_hold[0]:
             if segurando[0]:
                 self.transform(ini_cursor, cursor, move=True)
             else:
+                soltou_agora = True
                 self.is_hold[0] = False
-                if abs(self.position[0] - self.right_point[0]) < 15 and \
-                        abs(self.position[1] - self.right_point[1]) < 15:
-                    self.transform(self.position, self.right_point, move=True)
         if self.is_hold[2]:
             if segurando[2]:
                 self.transform(ini_cursor, cursor, rotate=True)
             else:
+                soltou_agora = True
                 self.is_hold[2] = False
 
-    def is_within(self, cursor) -> bool:
-        """ Tells if a point is within the polygon """
-        odd_nodes = False
-        for index in range(len(self.rel_pts)):
-            if (self.rel_pts[index][1] > cursor[1] > self.rel_pts[index - 1][1] or self.rel_pts[index][1]
-                < cursor[1] < self.rel_pts[index - 1][1]) \
-                    and (cursor[0] >= self.rel_pts[index][0] or cursor[0] >= self.rel_pts[index - 1][0]):
-                if (((self.rel_pts[index][0] - self.rel_pts[index - 1][0]) * (cursor[1] - self.rel_pts[index][1])) /
-                        (self.rel_pts[index - 1][1] - self.rel_pts[index][1])) > self.rel_pts[index][0] - cursor[0]:
-                    odd_nodes = not odd_nodes
-        return odd_nodes
+        ang_tolerance = 10
+        lin_tolerance = 15
+        """ goes into right position and angle if inside tolerances """
+        if soltou_agora:
+            if abs(self.position[0] - self.right_point[0]) < lin_tolerance \
+                    and abs(self.position[1] - self.right_point[1]) < lin_tolerance:
+                if (self.right_rotation < ang_tolerance and
+                        (self.rotation > 360 - ang_tolerance - self.right_rotation
+                         or self.rotation < self.right_rotation + ang_tolerance)) or \
+                        (self.right_rotation > ang_tolerance and
+                         self.right_rotation - ang_tolerance < self.rotation < self.right_rotation + ang_tolerance):
+                    self.position = self.right_point
+                    self.rotation = self.right_rotation
+                    self.transform()
 
-    def transform(self, ini_cursor, fin_cursor, move=False, rotate=False):
+    def transform(self, ini_cursor=(0, 0), fin_cursor=(0, 0), move=False, rotate=False):
         """ Moves or rotates the polygon """
-        """ Unfortunately I couldn't make two separate functions"""
+        """ Unfortunately I couldn't make two separate auxiliar"""
+        global mouse_cursor
+        self.rotation = self.rotation % 360
         if rotate:
-            self.rotation += fin_cursor[1] - ini_cursor[1]
+            mouse_cursor = 'ROTATE'
+            self.rotation += (fin_cursor[1] - ini_cursor[1] - fin_cursor[0] + ini_cursor[0])/2
         if move:
+            mouse_cursor = 'MOVE'
             self.position = [self.position[0] + fin_cursor[0] - ini_cursor[0],
                              self.position[1] + fin_cursor[1] - ini_cursor[1]]
-        rotated = []
-        for index in range(len(self.points)):
-            hip = mf.distance(self.barycentre, self.points[index])
-            tangente = (self.points[index][1] - self.barycentre[1]) / (self.points[index][0] - self.barycentre[0])
-            angle = atan(tangente)
 
-            if angle > 0 and self.points[index][0] - self.barycentre[0] < 0:
-                angle += pi
-            elif angle < 0 and self.points[index][0] - self.barycentre[0] < 0:
-                angle += pi
-
-            angle += self.rotation / 57.29
-            co = round(sin(angle) * hip)
-            ca = round(cos(angle) * hip)
-            rotated.append((self.barycentre[0] + co, self.barycentre[1] + ca))
-        print(rotated)
+        rotated = mf.rotate(self.points, self.barycentre, self.rotation)
         self.rel_pts = [(self.position[0] + point[0], self.position[1] + point[1]) for point in rotated]
 
     def is_in_right_point(self):
@@ -164,7 +160,7 @@ class Click:
         terminou = False
         if clicou_agora:
             if self.is_within(cursor):
-                self.symbol_surf = self.font.render(self.symbol + '=' + self.value, True, RED)
+                self.symbol_surf = self.font.render(self.symbol + '=' + self.value, True, LIGHT_BLUE)
                 self.is_getting_input = True
             else:
                 terminou = True
@@ -199,7 +195,7 @@ class Click:
                 self.value = self.value[:-1]
             else:
                 self.value += text
-            self.symbol_surf = self.font.render(self.symbol + '=' + self.value, True, RED)
+            self.symbol_surf = self.font.render(self.symbol + '=' + self.value, True, LIGHT_BLUE)
 
     def blit(self):
         self.surface.blit(self.symbol_surf, self.pos)
@@ -246,8 +242,6 @@ polygons = [Polygon(WINDOWSIZE, [[0, 0], [0, 148], [298, 148], [298, 0]], [600, 
             Polygon(WINDOWSIZE, [[0, 0], [85, 150], [85, 0]], [350, 400], (85, 200), color=YELLOW)]
 polygons_update = []  # these polygons will be updated
 polygons_show = []  # these polygons will be shown
-polygons_update.extend((0, 1, 2))
-polygons_show.extend((0, 1, 2))
 
 clicaveis = [Click('α', (346, 218), clickSurf, '90', [57, 62, 253, 23]),
              Click('R', (340, 285), clickSurf, '9', [595, 37, 96, 23])]
@@ -260,6 +254,7 @@ angles_update = [0, 1, 2]  # these angles will be shown and updated
 
 # main loop
 while True:
+    mouse_cursor = 'ARROW'
     screen.fill(WHITE)
     clickSurf.fill(TRANSPARENT)
 
@@ -293,12 +288,14 @@ while True:
         polygons[index].draw()
     for index in clicaveis_update:
         clicaveis[index].update(mouse['just_pressed'][0], mouse['pos_rect'], user_input)
+    if any([b.is_within(mouse['pos_rect']) and index in clicaveis_update for index, b in enumerate(clicaveis)]):
+        mouse_cursor = 'HAND'
     for index in angles_update:
         for angulo in angles[index]:
             angulo.draw()
 
     if polygons_show:
-        # splitting the angles according to the polygons
+        # splitting the angles according to the polygons that are in place
         if len(angles[1]) == 1:
             if polygons[0].is_in_right_point() or polygons[2].is_in_right_point():
                 angles[1] = [Angle(0, 90, (170, 350), clickSurf, (195, 310)),
@@ -320,8 +317,8 @@ while True:
                 clicaveis_update.remove(0)
 
         if all([clicavel.is_value_right() for clicavel in clicaveis]):
-            polygons_update.extend((0, 1, 2))
-            polygons_show.extend((0, 1, 2))
+            polygons_update += (0, 1, 2)
+            polygons_show += (0, 1, 2)
 
     for key in contador:
         contador[key] -= 1
@@ -340,3 +337,13 @@ while True:
     ini_mouse = mouse['pos_rect']
     user_input = ''
     mouse['just_pressed'] = [False, False, False]
+
+    # cursor update
+    if mouse_cursor == 'HAND':
+        pg.mouse.set_system_cursor(pg.SYSTEM_CURSOR_HAND)
+    if mouse_cursor == 'ARROW':
+        pg.mouse.set_system_cursor(pg.SYSTEM_CURSOR_ARROW)
+    if mouse_cursor == 'MOVE':
+        pg.mouse.set_cursor((16, 16), (0, 0), *cursors.move_cursor)
+    if mouse_cursor == 'ROTATE':
+        pg.mouse.set_cursor((16, 16), (0, 0), *cursors.rotate_cursor)

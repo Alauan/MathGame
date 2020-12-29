@@ -1,5 +1,5 @@
 from typing import Union, List, Tuple
-from math import sqrt
+from math import sqrt, sin, cos, atan2
 
 
 def barycentre(points: Union[List, Tuple], get_round=False) -> tuple:
@@ -46,3 +46,26 @@ def area(points: Union[List, Tuple]) -> int:
 def distance(p1, p2):
     return sqrt(abs(p1[0]-p2[0])**2 + abs(p1[1]-p2[1])**2)
 
+
+def rotate(points: Union[List, Tuple], center: Union[List, Tuple], rotation) -> List:
+    rotated = []
+    for index in range(len(points)):
+        hip = distance(center, points[index])
+        angle = atan2(points[index][1] - center[1], points[index][0] - center[0])
+        angle += rotation / 57.29
+        co = round(sin(angle) * hip)
+        ca = round(cos(angle) * hip)
+        rotated.append((center[0] + ca, center[1] + co))
+    return rotated
+
+
+def is_within(points, point) -> bool:
+    """ Tells if a point is within a polygon """
+    odd_nodes = False
+    for index in range(len(points)):
+        if (points[index][1] > point[1] > points[index - 1][1] or points[index][1] < point[1] < points[index - 1][1]) \
+                and (point[0] >= points[index][0] or point[0] >= points[index - 1][0]):
+            if (((points[index][0] - points[index - 1][0]) * (point[1] - points[index][1])) /
+                    (points[index - 1][1] - points[index][1])) > points[index][0] - point[0]:
+                odd_nodes = not odd_nodes
+    return odd_nodes
