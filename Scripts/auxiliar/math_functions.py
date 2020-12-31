@@ -69,3 +69,21 @@ def is_within(points, point) -> bool:
                     (points[index - 1][1] - points[index][1])) > points[index][0] - point[0]:
                 odd_nodes = not odd_nodes
     return odd_nodes
+
+
+def resize(points, proportion):
+    return [(points[0][0] + (x - points[0][0]) * proportion,
+             points[0][1] + (y - points[0][1]) * proportion) for x, y in points]
+
+
+def add_vectors(v1, v2):
+    result = []
+    for index in range(len(v1)):
+        result.append(v1[index] + v2[index])
+    return result
+
+def sub_vectors(v1, v2):
+    result = []
+    for index in range(len(v1)):
+        result.append(v1[index] - v2[index])
+    return result

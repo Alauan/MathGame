@@ -27,9 +27,9 @@ font_enunciado = pg.font.SysFont('Calibri', 20)
 # surfaces
 WINDOWSIZE = 900, 600
 screen = pg.display.set_mode(WINDOWSIZE)
-levelSurf = pg.Surface(WINDOWSIZE, flags=SRCALPHA)
-clickSurf = pg.Surface(WINDOWSIZE, flags=SRCALPHA)
-highlights = pg.Surface(WINDOWSIZE, flags=SRCALPHA)
+surf = []
+for i in range(6):
+    surf.append(pg.Surface(WINDOWSIZE, flags=SRCALPHA))
 
 
 # level surface
@@ -45,27 +45,30 @@ def ref(points):
         return result
 
 
-levelSurf.fill(TRANSPARENT)
-pg.draw.circle(levelSurf, BLACK, ref((400, 250)), 150, 1)
-pg.draw.aalines(levelSurf, BLACK, True, ref(((250, 250), (550, 250), (809, 100), (164, 100))))
-pg.draw.aaline(levelSurf, BLACK, ref((400, 450)), ref((400, 50)))
+surf[2].fill(TRANSPARENT)
+pg.draw.circle(surf[2], BLACK, ref((400, 250)), 150, 1)
+pg.draw.aalines(surf[2], BLACK, True, ref(((250, 250), (550, 250), (809, 100), (164, 100))))
+pg.draw.aaline(surf[2], BLACK, ref((400, 450)), ref((400, 50)))
 Enunciado = ['1- Os pontos B e F são extremidades da circunferência de equação x² + y² = 81 e o segmento ',
              'DE é tangente à circunferência dada no ponto C(0, 9)']
 for index, linha in enumerate(Enunciado):
-    levelSurf.blit(font_enunciado.render(linha, True, BLACK), (60, 25*index+40))
+    surf[2].blit(font_enunciado.render(linha, True, BLACK), (60, 25*index+40))
 
 # variables
 mouse = {'buttons': [False, False, False], 'pos_rect': (0, 0), 'just_pressed': [False, False, False]}
 ini_mouse = mouse['pos_rect']
 user_input = ''
 contar = []
-contador = {}
+contador = {}  # this dictionary will be used for animations, the key will be a string containing p for polygons and
+# c for clickables + ' ' + index, ex.: 'p 1' for the polygon with index 1. The value is the counter.
 
 
 # classes
 class Polygon:
-    def __init__(self, window_size, points, position, right_point=(0, 0), rotation=0, right_rotation=0, color=RED):
-        self.surface = pg.Surface(window_size, flags=SRCALPHA)
+    def __init__(self, surface, points, position, right_point=(0, 0), rotation=0, right_rotation=0, color=BLACK):
+        self.surface = surface
+        self.pre_surface = pg.Surface(WINDOWSIZE, flags=SRCALPHA)  # this surface is needed to make transparency
+        # between polygons
         self.position = list(position)
         self.rotation = rotation  # In degrees
         self.right_rotation = right_rotation
@@ -75,16 +78,15 @@ class Polygon:
         self.transform()
 
         self.color = pg.Color(color)
+        self.fill_color = (0, 0, 0, 30)
         self.right_point = list(right_point)  # The point witch the polygon will stick
         self.n_sides = len(points)
         self.is_hold = [0, 0, 0]  # holds a list containing mouse buttons that were pressed inside the polygon
 
     def update(self, clicou_agora: Union[List, Tuple], cursor: List, ini_cursor: List, segurando: Union[List, Tuple]):
-        """ This function must be executed every loop """
-        """ Exceptionally, self.draw() is not inside update() because there are some cases that I want to 
+        """ Exceptionally, self.draw() is not inside update() because there are some cases that I want to
         draw the polygons and not be able to move them"""
         soltou_agora = False
-        self.surface.fill(TRANSPARENT)
         if any(clicou_agora):
             if mf.is_within(self.rel_pts, cursor):
                 self.is_hold = clicou_agora
@@ -137,17 +139,18 @@ class Polygon:
 
     def draw(self):
         """ Draws the polygon onto its surface """
-        pg.draw.polygon(self.surface, (0, 0, 0, 30), self.rel_pts)
-        pg.draw.lines(self.surface, self.color, True, self.rel_pts, 2)
+        self.pre_surface.fill(TRANSPARENT)
+        pg.draw.polygon(self.pre_surface, self.fill_color, self.rel_pts)
+        pg.draw.lines(self.pre_surface, self.color, True, self.rel_pts, 2)
+        self.surface.blit(self.pre_surface, (0, 0))
 
 
 class Click:
-    def __init__(self, symbol: str, pos, surface, right_value, rect=None):
+    def __init__(self, symbol: str, pos, surface, right_value):
         self.symbol = symbol
         self.pos = pos
         self.surface = surface
         self.right_value = right_value
-        self.rect = rect
         self.box = pg.Rect((pos[0], pos[1], 30, 30))
         self.value = ''
         self.is_getting_input = False
@@ -179,8 +182,6 @@ class Click:
 
         if self.is_getting_input:
             self.open(caractere)
-            if self.rect:
-                pg.draw.rect(self.surface, YELLOW, self.rect)
         self.blit()
 
     def is_value_right(self):
@@ -237,26 +238,44 @@ class Angle:
             self.surface.blit(self.num_surf, self.num_pos)
 
 
-polygons = [Polygon(WINDOWSIZE, [[0, 0], [0, 148], [298, 148], [298, 0]], [600, 400], (171, 201)),
-            Polygon(WINDOWSIZE, [[0, 0], [259, 0], [0, 150]], [450, 400], (471, 200), color=GREEN),
-            Polygon(WINDOWSIZE, [[0, 0], [85, 150], [85, 0]], [350, 400], (85, 200), color=YELLOW)]
+polygons = [Polygon(surf[3], [[0, 0], [0, 148], [298, 148], [298, 0]], [600, 400], (171, 201)),
+            Polygon(surf[3], [[0, 0], [259, 0], [0, 150]], [450, 400], (471, 200)),
+            Polygon(surf[3], [[0, 0], [85, 150], [85, 0]], [350, 400], (85, 200))]
 polygons_update = []  # these polygons will be updated
 polygons_show = []  # these polygons will be shown
+polygons_update += (0, 1, 2)
+polygons_show += (0, 1, 2)
+polygon_near = -1  # tells witch polygon is "near". When the value is -1, none of them are
 
-clicaveis = [Click('α', (346, 218), clickSurf, '90', [57, 62, 253, 23]),
-             Click('R', (340, 285), clickSurf, '9', [595, 37, 96, 23])]
+ticks = 15
+anim_info_poly = [[(100, 100), 2.4, 0], [(150, 150), 1.6, 170], [(500, 200), 4, 85]]
+for index, info in enumerate(anim_info_poly):
+    go_to = info[0]
+    resize = info[1] - 1
+    rotation = info[2]
+    stepX = (go_to[0] - polygons[index].right_point[0]) / ticks
+    stepY = (go_to[1] - polygons[index].right_point[1]) / ticks
+    rot_step = rotation * 2 / ticks
+    anim_info_poly[index] = {'steps': (stepX, stepY), 'rot_step': rot_step, 'resize': resize, 'ticks': ticks}
+
+clicaveis = [Click('α', (346, 218), surf[1], '90'),
+             Click('R', (340, 285), surf[1], '9'),
+             Click('b', (419, 108), surf[-1], '18')]
 clicaveis_update = [0, 1]  # these clicaveis will be shown and updated
+highlights = [[57, 62, 253, 23], [595, 37, 96, 23], None]
+highlines = [None, [(320, 200), (320, 350)], [(96, 94), (811, 94)]]
 
-angles = [[Angle(270, 89, (320, 200), clickSurf)],
-          [Angle(0, 120, (170, 350), clickSurf, (195, 310))],
-          [Angle(30, 150, (470, 350), clickSurf, (398, 307))]]
+angles = [[Angle(270, 89, (320, 200), surf[1])],
+          [Angle(0, 120, (170, 350), surf[1], (195, 310))],
+          [Angle(30, 150, (470, 350), surf[1], (398, 307))]]
 angles_update = [0, 1, 2]  # these angles will be shown and updated
-
 # main loop
 while True:
     mouse_cursor = 'ARROW'
     screen.fill(WHITE)
-    clickSurf.fill(TRANSPARENT)
+    for index, surface in enumerate(surf):
+        if index != 2:
+            surface.fill(TRANSPARENT)
 
     for event in pg.event.get():
         if event.type == QUIT:
@@ -298,17 +317,32 @@ while True:
         # splitting the angles according to the polygons that are in place
         if len(angles[1]) == 1:
             if polygons[0].is_in_right_point() or polygons[2].is_in_right_point():
-                angles[1] = [Angle(0, 90, (170, 350), clickSurf, (195, 310)),
-                             Angle(90, 30, (170, 350), clickSurf, (142, 284), tamanho=70)]
+                angles[1] = [Angle(0, 90, (170, 350), surf[1], (195, 310)),
+                             Angle(90, 30, (170, 350), surf[1], (142, 284), tamanho=70)]
         if len(angles[2]) == 1:
             if polygons[0].is_in_right_point() or polygons[1].is_in_right_point():
-                angles[2] = [Angle(30, 60, (470, 350), clickSurf, (480, 301)),
-                             Angle(90, 90, (470, 350), clickSurf, (412, 310))]
+                angles[2] = [Angle(30, 60, (470, 350), surf[1], (480, 301)),
+                             Angle(90, 90, (470, 350), surf[1], (412, 310))]
 
         # stopping to update polygons that are already on the right spot
         for index in polygons_update:
             if polygons[index].is_in_right_point():
                 polygons_update.remove(index)
+
+        # starting animations
+        if mouse['just_pressed'][0]:
+            if polygon_near >= 0:
+                if not mf.is_within(polygons[polygon_near].rel_pts, mouse['pos_rect']):
+                    polygons[polygon_near].surface = surf[3]
+                    contador[f'p {polygon_near}'] = anim_info_poly[polygon_near]['ticks']
+                    polygon_near = -1
+
+            if all(poly.is_in_right_point() for poly in polygons):
+                for index, poly in enumerate(polygons):
+                    if mf.is_within(poly.rel_pts, mouse['pos_rect']):
+                        polygon_near = index
+                        polygons[index].surface = surf[4]
+                        contador[f'p {index}'] = anim_info_poly[index]['ticks']
 
     else:
         if 0 in clicaveis_update:
@@ -316,18 +350,46 @@ while True:
                 angles[0][0].grau = 90
                 clicaveis_update.remove(0)
 
-        if all([clicavel.is_value_right() for clicavel in clicaveis]):
-            polygons_update += (0, 1, 2)
-            polygons_show += (0, 1, 2)
+        if all([clicavel.is_value_right() for clicavel in clicaveis[:2]]):
+            pass
 
-    for key in contador:
-        contador[key] -= 1
+    for index, clicavel in enumerate(clicaveis):
+        if clicavel.is_getting_input:
+            if highlights[index]:
+                pg.draw.rect(surf[0], YELLOW, highlights[index])
+            if highlines[index]:
+                pg.draw.line(surf[-1], RED, *highlines[index], width=3)
 
+    # animation
+    for key, n in contador.items():
+        index = int(key.split()[-1])
+        obj = key.split()[0]
+        count_to_1 = (anim_info_poly[index]['ticks'] - n) / anim_info_poly[index]['ticks']
+        count_to_0 = 1 - count_to_1
+        if obj == 'p':
+            if polygon_near >= 0:
+                polygons[index].rotation += anim_info_poly[index]['rot_step']
+                polygons[index].position = mf.add_vectors(polygons[index].position, anim_info_poly[index]['steps'])
+                polygons[index].transform((0, 0), (0, 0), move=True, rotate=True)
+                polygons[index].rel_pts = mf.resize(polygons[index].rel_pts, count_to_1 * anim_info_poly[index]['resize'] + 1)
+                polygons[index].fill_color = (count_to_1 * 255, count_to_1 * 255, count_to_1 * 255, count_to_1 * 225 + 30)
+            else:
+                polygons[index].rotation -= anim_info_poly[index]['rot_step']
+                polygons[index].position = mf.sub_vectors(polygons[index].position, anim_info_poly[index]['steps'])
+                polygons[index].transform((0, 0), (0, 0), move=True, rotate=True)
+                polygons[index].rel_pts = mf.resize(polygons[index].rel_pts, count_to_0 * anim_info_poly[index]['resize'] + 1)
+                polygons[index].fill_color = (count_to_0 * 255, count_to_0 * 255, count_to_0 * 255, count_to_0 * 225 + 30)
+
+        if n == 0:  # if the counting ended
+            if key == 'p 0':
+                if polygon_near >= 0:
+                    clicaveis_update.append(2)
+                else:
+                    clicaveis_update.remove(2)
+                    # todo if poly 2 is pressed other ones stop working
     # screen assembly
-    screen.blit(clickSurf, (0, 0))
-    screen.blit(levelSurf, (0, 0))
-    for poly in polygons:
-        screen.blit(poly.surface, (0, 0))
+    for surface in surf:
+        screen.blit(surface, (0, 0))
 
     # screen update
     clock.tick(60)
@@ -337,6 +399,14 @@ while True:
     ini_mouse = mouse['pos_rect']
     user_input = ''
     mouse['just_pressed'] = [False, False, False]
+    keys_to_pop = []
+    for key in contador:
+        if contador[key] > 0:
+            contador[key] -= 1
+        else:
+            keys_to_pop.append(key)
+    for key in keys_to_pop:
+        contador.pop(key)
 
     # cursor update
     if mouse_cursor == 'HAND':
