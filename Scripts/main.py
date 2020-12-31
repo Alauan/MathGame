@@ -52,7 +52,7 @@ pg.draw.aaline(surf[2], BLACK, ref((400, 450)), ref((400, 50)))
 Enunciado = ['1- Os pontos B e F são extremidades da circunferência de equação x² + y² = 81 e o segmento ',
              'DE é tangente à circunferência dada no ponto C(0, 9)']
 for index, linha in enumerate(Enunciado):
-    surf[2].blit(font_enunciado.render(linha, True, BLACK), (60, 25*index+40))
+    surf[2].blit(font_enunciado.render(linha, True, BLACK), (60, 25 * index + 40))
 
 # variables
 mouse = {'buttons': [False, False, False], 'pos_rect': (0, 0), 'just_pressed': [False, False, False]}
@@ -110,8 +110,8 @@ class Polygon:
             if abs(self.position[0] - self.right_point[0]) < lin_tolerance \
                     and abs(self.position[1] - self.right_point[1]) < lin_tolerance:
                 if (self.right_rotation < ang_tolerance and
-                        (self.rotation > 360 - ang_tolerance - self.right_rotation
-                         or self.rotation < self.right_rotation + ang_tolerance)) or \
+                    (self.rotation > 360 - ang_tolerance - self.right_rotation
+                     or self.rotation < self.right_rotation + ang_tolerance)) or \
                         (self.right_rotation > ang_tolerance and
                          self.right_rotation - ang_tolerance < self.rotation < self.right_rotation + ang_tolerance):
                     self.position = self.right_point
@@ -125,7 +125,7 @@ class Polygon:
         self.rotation = self.rotation % 360
         if rotate:
             mouse_cursor = 'ROTATE'
-            self.rotation += (fin_cursor[1] - ini_cursor[1] - fin_cursor[0] + ini_cursor[0])/2
+            self.rotation += (fin_cursor[1] - ini_cursor[1] - fin_cursor[0] + ini_cursor[0]) / 2
         if move:
             mouse_cursor = 'MOVE'
             self.position = [self.position[0] + fin_cursor[0] - ini_cursor[0],
@@ -238,24 +238,22 @@ class Angle:
             self.surface.blit(self.num_surf, self.num_pos)
 
 
-polygons = [Polygon(surf[3], [[0, 0], [0, 148], [298, 148], [298, 0]], [600, 400], (171, 201)),
-            Polygon(surf[3], [[0, 0], [259, 0], [0, 150]], [450, 400], (471, 200)),
-            Polygon(surf[3], [[0, 0], [85, 150], [85, 0]], [350, 400], (85, 200))]
+polygons = [Polygon(surf[3], [[0, 0], [0, 148], [298, 148], [298, 0]], [600, 400], (171, 200), 40),
+            Polygon(surf[3], [[0, 0], [259, 0], [0, 150]], [450, 400], (471, 200), 140),
+            Polygon(surf[3], [[0, 0], [85, 150], [85, 0]], [350, 400], (85, 200), 270)]
 polygons_update = []  # these polygons will be updated
 polygons_show = []  # these polygons will be shown
-polygons_update += (0, 1, 2)
-polygons_show += (0, 1, 2)
 polygon_near = -1  # tells witch polygon is "near". When the value is -1, none of them are
 
 ticks = 15
-anim_info_poly = [[(100, 100), 2.4, 0], [(150, 150), 1.6, 170], [(500, 200), 4, 85]]
+anim_info_poly = [[(100, 100), 2.4, 0], [(600, 350), 2.4, 180], [(500, 200), 4, 85]]
 for index, info in enumerate(anim_info_poly):
     go_to = info[0]
     resize = info[1] - 1
     rotation = info[2]
     stepX = (go_to[0] - polygons[index].right_point[0]) / ticks
     stepY = (go_to[1] - polygons[index].right_point[1]) / ticks
-    rot_step = rotation * 2 / ticks
+    rot_step = rotation / ticks
     anim_info_poly[index] = {'steps': (stepX, stepY), 'rot_step': rot_step, 'resize': resize, 'ticks': ticks}
 
 clicaveis = [Click('α', (346, 218), surf[1], '90'),
@@ -263,12 +261,17 @@ clicaveis = [Click('α', (346, 218), surf[1], '90'),
              Click('b', (419, 108), surf[-1], '18')]
 clicaveis_update = [0, 1]  # these clicaveis will be shown and updated
 highlights = [[57, 62, 253, 23], [595, 37, 96, 23], None]
-highlines = [None, [(320, 200), (320, 350)], [(96, 94), (811, 94)]]
+highlines = [None, [(320, 200), (320, 350)], [(100, 100), (816, 100)]]
 
 angles = [[Angle(270, 89, (320, 200), surf[1])],
           [Angle(0, 120, (170, 350), surf[1], (195, 310))],
-          [Angle(30, 150, (470, 350), surf[1], (398, 307))]]
+          [Angle(30, 150, (470, 350), surf[1], (398, 307))],
+          [Angle(270, 90, (100, 101), surf[-1]), Angle(180, 90, (814, 101), surf[-1]),
+          Angle(0, 90, (100, 455), surf[-1]), Angle(90, 90, (814, 455), surf[-1])],
+          [Angle(210, 60, (774, 91), surf[-1], (734, 130), 70), Angle(90, 90, (774, 450), surf[-1]),
+          Angle(0, 30, (151, 450), surf[-1], tamanho=80)]]
 angles_update = [0, 1, 2]  # these angles will be shown and updated
+
 # main loop
 while True:
     mouse_cursor = 'ARROW'
@@ -285,7 +288,10 @@ while True:
             if event.button <= 3:
                 mouse['buttons'][event.button - 1] = True
                 mouse['just_pressed'][event.button - 1] = True
-                print(mouse['pos_rect'])
+                if event.button == 1:
+                    print(mouse['pos_rect'])
+                else:
+                    print(f'\033[1;32m{mouse["pos_rect"]}\033[m')
         elif event.type == MOUSEBUTTONUP:
             if event.button <= 3:
                 mouse['buttons'][event.button - 1] = False
@@ -334,7 +340,7 @@ while True:
             if polygon_near >= 0:
                 if not mf.is_within(polygons[polygon_near].rel_pts, mouse['pos_rect']):
                     polygons[polygon_near].surface = surf[3]
-                    contador[f'p {polygon_near}'] = anim_info_poly[polygon_near]['ticks']
+                    contador[f'p {polygon_near}'] = anim_info_poly[polygon_near]['ticks'] - 1
                     polygon_near = -1
 
             if all(poly.is_in_right_point() for poly in polygons):
@@ -342,7 +348,7 @@ while True:
                     if mf.is_within(poly.rel_pts, mouse['pos_rect']):
                         polygon_near = index
                         polygons[index].surface = surf[4]
-                        contador[f'p {index}'] = anim_info_poly[index]['ticks']
+                        contador[f'p {index}'] = anim_info_poly[index]['ticks'] - 1
 
     else:
         if 0 in clicaveis_update:
@@ -351,7 +357,8 @@ while True:
                 clicaveis_update.remove(0)
 
         if all([clicavel.is_value_right() for clicavel in clicaveis[:2]]):
-            pass
+            polygons_update += (0, 1, 2)
+            polygons_show += (0, 1, 2)
 
     for index, clicavel in enumerate(clicaveis):
         if clicavel.is_getting_input:
@@ -370,23 +377,38 @@ while True:
             if polygon_near >= 0:
                 polygons[index].rotation += anim_info_poly[index]['rot_step']
                 polygons[index].position = mf.add_vectors(polygons[index].position, anim_info_poly[index]['steps'])
-                polygons[index].transform((0, 0), (0, 0), move=True, rotate=True)
-                polygons[index].rel_pts = mf.resize(polygons[index].rel_pts, count_to_1 * anim_info_poly[index]['resize'] + 1)
-                polygons[index].fill_color = (count_to_1 * 255, count_to_1 * 255, count_to_1 * 255, count_to_1 * 225 + 30)
+                polygons[index].transform((0, 0), (0, 0))
+                polygons[index].rel_pts = mf.resize(polygons[index].rel_pts,
+                                                    count_to_1 * anim_info_poly[index]['resize'] + 1)
+                polygons[index].fill_color = (count_to_1 * 255,
+                                              count_to_1 * 255, count_to_1 * 255, count_to_1 * 225 + 30)
             else:
                 polygons[index].rotation -= anim_info_poly[index]['rot_step']
                 polygons[index].position = mf.sub_vectors(polygons[index].position, anim_info_poly[index]['steps'])
-                polygons[index].transform((0, 0), (0, 0), move=True, rotate=True)
-                polygons[index].rel_pts = mf.resize(polygons[index].rel_pts, count_to_0 * anim_info_poly[index]['resize'] + 1)
-                polygons[index].fill_color = (count_to_0 * 255, count_to_0 * 255, count_to_0 * 255, count_to_0 * 225 + 30)
+                polygons[index].transform((0, 0), (0, 0))
+                polygons[index].rel_pts = mf.resize(polygons[index].rel_pts,
+                                                    count_to_0 * anim_info_poly[index]['resize'] + 1)
+                polygons[index].fill_color = (count_to_0 * 255,
+                                              count_to_0 * 255, count_to_0 * 255, count_to_0 * 225 + 30)
 
         if n == 0:  # if the counting ended
-            if key == 'p 0':
-                if polygon_near >= 0:
-                    clicaveis_update.append(2)
-                else:
-                    clicaveis_update.remove(2)
-                    # todo if poly 2 is pressed other ones stop working
+            if polygon_near == -1:
+                # I have to do this because they don't return correctly sometimes
+                polygons[index].position = polygons[index].right_point
+                polygons[index].rotation = polygons[index].right_rotation
+            if polygon_near == 0:
+                clicaveis_update.append(2)
+                angles_update.append(3)
+            elif polygon_near == 1:
+                angles_update.append(4)
+
+        if n == anim_info_poly[index]['ticks'] - 1:  # if counting started
+            if key == 'p 0' and polygon_near == -1:
+                clicaveis_update.remove(2)
+                angles_update.remove(3)
+            if key == 'p 1' and polygon_near == -1:
+                angles_update.remove(4)
+
     # screen assembly
     for surface in surf:
         screen.blit(surface, (0, 0))

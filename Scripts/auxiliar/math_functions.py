@@ -82,6 +82,7 @@ def add_vectors(v1, v2):
         result.append(v1[index] + v2[index])
     return result
 
+
 def sub_vectors(v1, v2):
     result = []
     for index in range(len(v1)):
